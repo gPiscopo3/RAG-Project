@@ -1,31 +1,14 @@
-from ollama import Client
-from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+from common.rag_response import generate_rag_response
+from utils.pdf_utils import process_pdf_to_chroma_db
 
-ollama_host_url = "http://localhost:11434/"
-local_model = "llama3"
-embedding_model = "nomic-embed-text"
-client = Client(host=ollama_host_url)
+if __name__ == "__main__":
+    # Example usage: Process a PDF and create a Chroma database
+    pdf_path = "aws-overview.pdf"  # Replace with your PDF file path
+    process_pdf_to_chroma_db(pdf_path)
 
-vector_db = Chroma(
-                persist_directory="./chroma_db", 
-                embedding_function=OllamaEmbeddings(model=embedding_model, base_url=ollama_host_url), 
-                collection_name="local_rag_db"
-                )
-retriever = vector_db.as_retriever()
+    # Example usage: Generate a RAG response
+    question = "What is the main topic of the document?"  # Replace with your question
+    answer = generate_rag_response(collection_name='aws-overview_collection', question=question)
 
-question = "What is the main topic of the document? What is the name of the Authors?"
-docs = retriever.invoke(question)
-print("Documents fetched from database : "+str(len(docs)))
-
-context = "\n\n".join(doc.page_content for doc in docs)
-
-# Create a RAG prompt in below format
-formatted_prompt = f"""Answer the question based ONLY on the following context:
-{context}
-Question: {question}
-"""
-
-# Call ollama chat api to generate the response from provided context
-response = client.chat(model='llama3',messages=[{'role': 'user', 'content': formatted_prompt}])
-print(response['message']['content'])
+    print("RAG Response:", answer)
+    

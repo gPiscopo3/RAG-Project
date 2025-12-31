@@ -1,4 +1,4 @@
-# Local-RAG: Motore di Ricerca Semantico Distribuito
+# Local-RAG: Motore di Ricerca Semantico
 
 ## 📌 Descrizione del Progetto
 
@@ -17,8 +17,6 @@ Il sistema è diviso in tre pipeline principali:
 * Ricerca per similarità (Cosine Similarity) nel DB vettoriale.
 * Costruzione del prompt arricchito (Context Injection).
 * Generazione della risposta tramite **Llama 3** (via Ollama).
-
-
 
 ## 🛠️ Stack Tecnologico
 
