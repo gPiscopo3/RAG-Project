@@ -5,7 +5,7 @@ from langchain_ollama import OllamaEmbeddings
 def generate_rag_response(
                           ollama_host_url = "http://localhost:11434/", 
                           local_model = "llama3", 
-                          embedding_model = "nomic-embed-text", 
+                          embedding_model = "mxbai-embed-large", 
                           question = None,
                           collection_name = "local_rag_db", 
                           persist_directory="./chroma_db",
@@ -24,6 +24,27 @@ def generate_rag_response(
     # Initialize the Ollama client to interact with the LLM model
     client = Client(host=ollama_host_url)
 
+    # Generate a search query from the user's question
+    query_generation_prompt = f"""You are an expert at rephrasing a user's question into a concise, keyword-based search query for a vector database. 
+    Extract only the most critical entities and technical terms. Do not add any explanation or introductory text.
+
+    Example:
+    User Question: "Can you tell me all about how to use AWS S3 for storing large video files?"
+    Search Query: "AWS S3 large video file storage"
+
+    ---
+
+    User Question: "{question}"
+    Search Query:"""
+
+    response = client.chat(
+        model=local_model, 
+        messages=[{'role': 'user', 'content': query_generation_prompt}],
+        options={'temperature': 0} # Vogliamo una risposta deterministica
+    )
+    search_query = response['message']['content'].strip().strip('"')
+    print(f"Generated Search Query: '{search_query}'")
+
     # Create or connect to a Chroma vector database for RAG
     vector_db = Chroma(
                     persist_directory = persist_directory,
@@ -32,11 +53,22 @@ def generate_rag_response(
                     )
     
     # Get a retriever to fetch relevant documents from the database
-    retriever = vector_db.as_retriever()
+    retriever = vector_db.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 8, "fetch_k": 20}
+    )
 
     # Retrieve the most relevant documents for the question
-    docs = retriever.invoke(question)
+    docs = retriever.invoke(search_query)
     print("Documents fetched from database : " + str(len(docs)))
+
+    # Print the retrieved documents for debugging purposes 
+    print("\n--- CONTESTO RECUPERATO ---")
+    for i, doc in enumerate(docs):
+        print(f"--- Documento {i+1} ---")
+        print(doc.page_content)
+        print("--------------------")
+    print("--- FINE CONTESTO ---\n")
 
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)
@@ -46,7 +78,7 @@ def generate_rag_response(
     {context}
     Question: {question}
     """
-
+    
     # Send the prompt to the LLM model and get the answer
     response = client.chat(model = local_model, messages = [{'role': 'user', 'content': formatted_prompt}])
     return(response['message']['content'])

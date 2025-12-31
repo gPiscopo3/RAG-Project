@@ -13,6 +13,10 @@ def extract_text_from_pdf(file_path):
         text += page.extract_text() + "\n"
     return text
 
+def normalize_text(text: str) -> str:
+    """Pulisce il testo per l'embedding."""
+    return text.replace("\n", " ").replace("\r", " ").strip().lower()
+
 def extract_metadata_from_pdf(file_path):
     reader = PdfReader(file_path)
     metadata = reader.metadata
@@ -28,8 +32,9 @@ def extract_tables_with_caption(file_path):
 
 def process_pdf_to_chroma_db(
                             pdf_path = None, 
-                            chunk_size=2000, 
-                            chunk_overlap=100, 
+                            chunk_size=512, 
+                            chunk_overlap=150, 
+                            model="mxbai-embed-large",
                             persist_directory="./chroma_db" 
                             ):
     """
@@ -49,25 +54,41 @@ def process_pdf_to_chroma_db(
 
     # Check if the collection already exists in ChromaDB
     chroma_client = chromadb.PersistentClient(path=persist_directory)
-    collection = chroma_client.get_collection(name=collection_name)
-    if collection:
-        print(f"Collection '{collection_name}' already exists in ChromaDB. Skipping processing.")
-        return
+
+    try:
+        collection = chroma_client.get_collection(name=collection_name)
+        if collection:
+            print(f"Collection '{collection_name}' already exists in ChromaDB. Skipping processing.")
+            return
+    except chromadb.errors.NotFoundError:
+        pass  # Collection does not exist, proceed with processing
 
     # Extract text from PDF
     extracted_text = extract_text_from_pdf(pdf_path)
     print("\nExtracted text from PDF.")
 
     # Split the text into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, 
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n",  # Paragrafi
+                    "\n",    # Linee
+                    " ",     # Parole
+                    ".",     # Frasi
+                    ",",     # Virgole
+                    ""       # Caratteri
+            ], 
+        keep_separator=False
+    )
+
     chunks = text_splitter.split_text(extracted_text)
     print(f"\nSplitted into {len(chunks)} chunks.")
 
     # Convert chunks into Document objects
-    docs = [Document(page_content=chunk, metadata={"chunk_index": i}) for i, chunk in enumerate(chunks)]
+    docs = [Document(page_content=normalize_text(chunk), metadata={"chunk_index": i}) for i, chunk in enumerate(chunks)]
 
     # Initialize the embeddings object
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
+    embeddings = OllamaEmbeddings(model=model)
 
     # Create the Chroma database
     Chroma.from_documents(
