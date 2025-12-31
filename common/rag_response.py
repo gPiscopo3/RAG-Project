@@ -1,6 +1,12 @@
 from ollama import Client
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 def generate_rag_response(
                           ollama_host_url = "http://localhost:11434/", 
@@ -43,7 +49,7 @@ def generate_rag_response(
         options={'temperature': 0} # Vogliamo una risposta deterministica
     )
     search_query = response['message']['content'].strip().strip('"')
-    print(f"Generated Search Query: '{search_query}'")
+    logging.info("Generated Search Query: '%s'", search_query)
 
     # Create or connect to a Chroma vector database for RAG
     vector_db = Chroma(
@@ -60,15 +66,13 @@ def generate_rag_response(
 
     # Retrieve the most relevant documents for the question
     docs = retriever.invoke(search_query)
-    print("Documents fetched from database : " + str(len(docs)))
+    logging.info("Documents fetched from database: %d", len(docs))
 
-    # Print the retrieved documents for debugging purposes 
-    print("\n--- CONTESTO RECUPERATO ---")
+    # Log the retrieved documents for debugging purposes 
+    logging.info("--- CONTESTO RECUPERATO ---")
     for i, doc in enumerate(docs):
-        print(f"--- Documento {i+1} ---")
-        print(doc.page_content)
-        print("--------------------")
-    print("--- FINE CONTESTO ---\n")
+        logging.info("--- Documento %d ---\n%s\n--------------------", i+1, doc.page_content)
+    logging.info("--- FINE CONTESTO ---")
 
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)

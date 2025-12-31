@@ -1,4 +1,10 @@
 import chromadb
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 def delete_chroma_collection(
                               collection_name: str, 
@@ -18,7 +24,6 @@ def delete_chroma_collection(
 
     try:
         chroma_client.delete_collection(name=collection_name)
-        print(f"Collection '{collection_name}' has been deleted from ChromaDB.")
+        logging.info("Collection '%s' has been deleted from ChromaDB.", collection_name)
     except chromadb.errors.NotFoundError:
-        print(f"Collection '{collection_name}' does not exist in ChromaDB.")
-
+        logging.warning("Collection '%s' does not exist in ChromaDB.", collection_name)

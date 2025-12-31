@@ -5,6 +5,13 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
+import logging
+
+# Configurazione base del logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 def extract_text_from_pdf(file_path):
     reader = PdfReader(file_path)
@@ -31,12 +38,13 @@ def extract_tables_with_caption(file_path):
     return []
 
 def process_pdf_to_chroma_db(
-                            pdf_path = None, 
-                            chunk_size=512, 
-                            chunk_overlap=150, 
-                            model="mxbai-embed-large",
-                            persist_directory="./chroma_db" 
-                            ):
+    pdf_path=None,
+    chunk_size=512,
+    chunk_overlap=150,
+    model="mxbai-embed-large",
+    persist_directory="./chroma_db",
+    collection_name=None
+):
     """
     Processes a PDF file, extracts the text, splits it into chunks, and creates a Chroma database.
 
@@ -50,7 +58,9 @@ def process_pdf_to_chroma_db(
     if pdf_path is None or pdf_path.strip() == "":
         raise ValueError("A valid PDF path must be provided.")
 
-    collection_name = pdf_path.split("/")[-1].replace(".pdf", "_collection")
+    # Usa il collection_name passato, oppure calcolalo come fallback
+    if collection_name is None:
+        collection_name = pdf_path.split("/")[-1].replace(".pdf", "_collection")
 
     # Check if the collection already exists in ChromaDB
     chroma_client = chromadb.PersistentClient(path=persist_directory)
@@ -58,14 +68,14 @@ def process_pdf_to_chroma_db(
     try:
         collection = chroma_client.get_collection(name=collection_name)
         if collection:
-            print(f"Collection '{collection_name}' already exists in ChromaDB. Skipping processing.")
+            logging.info(f"Collection '%s' already exists in ChromaDB. Skipping processing.", collection_name)
             return
     except chromadb.errors.NotFoundError:
         pass  # Collection does not exist, proceed with processing
 
     # Extract text from PDF
     extracted_text = extract_text_from_pdf(pdf_path)
-    print("\nExtracted text from PDF.")
+    logging.info("Extracted text from PDF.")
 
     # Split the text into chunks
     text_splitter = RecursiveCharacterTextSplitter(
@@ -82,7 +92,7 @@ def process_pdf_to_chroma_db(
     )
 
     chunks = text_splitter.split_text(extracted_text)
-    print(f"\nSplitted into {len(chunks)} chunks.")
+    logging.info("Splitted into %d chunks.", len(chunks))
 
     # Convert chunks into Document objects
     docs = [Document(page_content=normalize_text(chunk), metadata={"chunk_index": i}) for i, chunk in enumerate(chunks)]
@@ -98,4 +108,4 @@ def process_pdf_to_chroma_db(
         collection_name=collection_name,
     )
 
-    print(f"Chroma database created at {persist_directory} with collection name '{collection_name}'.")
+    logging.info("Chroma database created at %s with collection name '%s'.", persist_directory, collection_name)
