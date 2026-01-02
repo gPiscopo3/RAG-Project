@@ -2,6 +2,7 @@ from ollama import Client
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import logging
+import config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -9,13 +10,12 @@ logging.basicConfig(
 )
 
 def generate_rag_response(
-                          ollama_host_url = "http://localhost:11434/", 
-                          local_model = "llama3", 
-                          embedding_model = "nomic-embed-text", 
-                        #   embedding_model = "mxbai-embed-large",
-                          question = None,
-                          collection_name = None, 
-                          persist_directory="./chroma_db",
+                          ollama_host_url   = config.OLLAMA_HOST_URL, 
+                          local_model       = config.LOCAL_MODEL, 
+                          embedding_model   = config.EMBEDDING_MODEL, 
+                          question          = None,
+                          collection_name   = None, 
+                          persist_directory = config.PERSIST_DIRECTORY,
                           ):
     
     """

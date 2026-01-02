@@ -2,6 +2,7 @@ import chromadb
 import logging
 import camelot
 import fitz
+from common import config
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -10,7 +11,6 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma
 from tabulate import tabulate
 
-# Configurazione base del logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -93,13 +93,12 @@ def extract_tables_from_pdf(file_path):
         return []
 
 def process_pdf_to_chroma_db(
-    pdf_path=None,
-    chunk_size=512,
-    chunk_overlap=150,
-    model="nomic-embed-text",
-    # model="mxbai-embed-large",
-    persist_directory="./chroma_db",
-    collection_name=None
+    pdf_path            = None,
+    chunk_size          = config.CHUNK_SIZE,
+    chunk_overlap       = config.CHUNK_OVERLAP,
+    model               = config.EMBEDDING_MODEL,
+    persist_directory   = config.PERSIST_DIRECTORY,
+    collection_name     = None
 ):
     
     """
@@ -154,12 +153,11 @@ def process_pdf_to_chroma_db(
         if page_text:
             chunks = text_splitter.split_text(page_text)
             for j, chunk in enumerate(chunks):
-                # Unisci i metadati del PDF con quelli specifici del chunk
                 chunk_metadata = pdf_metadata.copy()
                 chunk_metadata.update({
                     "page_number": i + 1,
                     "chunk_index_in_page": j,
-                    "original_text": chunk  # Salva il testo originale non normalizzato
+                    "original_text": chunk
                 })
                 
                 normalized_chunk = normalize_text(chunk)

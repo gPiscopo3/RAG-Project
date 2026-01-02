@@ -1,14 +1,16 @@
 import streamlit as st
 import os
 import chromadb
+import time
 from utils.pdf_utils import process_pdf_to_chroma_db
 from common.rag_response import generate_rag_response
-import time
+from common import config
+
 
 st.title("RAG System with Local LLM and ChromaDB")
 st.text("Upload a PDF document then ask questions about its content.")
 
-chromadb_client = chromadb.PersistentClient(path="./chroma_db")
+chromadb_client = chromadb.PersistentClient(path=config.PERSIST_DIRECTORY)
 list_collections = chromadb_client.list_collections()
 
 # Side menu for show between existing collections
@@ -79,8 +81,8 @@ with st.sidebar:
             
             process_pdf_to_chroma_db(
                 pdf_path=temp_file_path,
-                persist_directory="./chroma_db",
-                model="nomic-embed-text",
+                persist_directory=config.PERSIST_DIRECTORY,
+                model=config.EMBEDDING_MODEL,
                 collection_name=collection_name
             )
             os.remove(temp_file_path)
@@ -113,7 +115,7 @@ if question := st.chat_input("Type your question here..."):
         answer = generate_rag_response(
             question=question,
             collection_name=selected_collection,
-            embedding_model="nomic-embed-text"
+            embedding_model=config.EMBEDDING_MODEL,
         )
         st.session_state.messages.append({"role": "assistant", "content": answer})
     
