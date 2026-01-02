@@ -11,9 +11,10 @@ logging.basicConfig(
 def generate_rag_response(
                           ollama_host_url = "http://localhost:11434/", 
                           local_model = "llama3", 
-                          embedding_model = "mxbai-embed-large", 
+                          embedding_model = "nomic-embed-text", 
+                        #   embedding_model = "mxbai-embed-large",
                           question = None,
-                          collection_name = "local_rag_db", 
+                          collection_name = None, 
                           persist_directory="./chroma_db",
                           ):
     
@@ -46,7 +47,7 @@ def generate_rag_response(
     response = client.chat(
         model=local_model, 
         messages=[{'role': 'user', 'content': query_generation_prompt}],
-        options={'temperature': 0} # Vogliamo una risposta deterministica
+        options={'temperature': 0}
     )
     search_query = response['message']['content'].strip().strip('"')
     logging.info("Generated Search Query: '%s'", search_query)

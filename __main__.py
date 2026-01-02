@@ -71,18 +71,16 @@ with st.sidebar:
 
     if uploaded_files is not None:
         with st.spinner(f"Processing {uploaded_files.name}..."):
-            # Usa il nome originale per la collection
             original_name = uploaded_files.name
             collection_name = original_name.replace(".pdf", "_collection")
             temp_file_path = f"./temp_{original_name}"
             with open(temp_file_path, "wb") as temp_file:
                 temp_file.write(uploaded_files.getbuffer())
             
-            # Passa collection_name esplicitamente
             process_pdf_to_chroma_db(
                 pdf_path=temp_file_path,
                 persist_directory="./chroma_db",
-                model="mxbai-embed-large",
+                model="nomic-embed-text",
                 collection_name=collection_name
             )
             os.remove(temp_file_path)
@@ -90,16 +88,36 @@ with st.sidebar:
             st.success(f"Processed {original_name} and updated ChromaDB.")
 
 # Main area for asking questions
-# Ensure at least one collection exists
 if not list_collections:
     st.warning("Please upload a PDF document to create a ChromaDB collection before asking questions.")
     st.stop()
+
 st.markdown(f"You are querying the collection: **{selected_collection}**")
+
+# Initialize chat history in session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display chat messages from history on app rerun
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Accept user input
 if question := st.chat_input("Type your question here..."):
-    with st.spinner("Generating RAG response..."):
-        answer = generate_rag_response(
-            question=question,
-            collection_name=selected_collection
-        )
-        st.chat_message("user").markdown(question)
-        st.chat_message("assistant").markdown(answer)
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": question})
+    # Display user message in chat message container
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    # Display assistant response in chat message container
+    with st.chat_message("assistant"):
+        with st.spinner("Generating RAG response..."):
+            answer = generate_rag_response(
+                question=question,
+                collection_name=selected_collection
+            )
+            st.markdown(answer)
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": answer})

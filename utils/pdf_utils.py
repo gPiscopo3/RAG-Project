@@ -41,10 +41,12 @@ def process_pdf_to_chroma_db(
     pdf_path=None,
     chunk_size=512,
     chunk_overlap=150,
-    model="mxbai-embed-large",
+    model="nomic-embed-text",
+    # model="mxbai-embed-large",
     persist_directory="./chroma_db",
     collection_name=None
 ):
+    
     """
     Processes a PDF file, extracts the text, splits it into chunks, and creates a Chroma database.
 
@@ -55,6 +57,7 @@ def process_pdf_to_chroma_db(
         persist_directory (str): Directory to save the Chroma database.
         collection_name (str): Name of the collection in the Chroma database.
     """ 
+
     if pdf_path is None or pdf_path.strip() == "":
         raise ValueError("A valid PDF path must be provided.")
 
@@ -87,7 +90,7 @@ def process_pdf_to_chroma_db(
                     ".",     # Frasi
                     ",",     # Virgole
                     ""       # Caratteri
-            ], 
+                   ], 
         keep_separator=False
     )
 
