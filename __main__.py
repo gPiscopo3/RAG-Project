@@ -86,6 +86,7 @@ with st.sidebar:
             os.remove(temp_file_path)
             
             st.success(f"Processed {original_name} and updated ChromaDB.")
+    
 
 # Main area for asking questions
 if not list_collections:
@@ -107,17 +108,14 @@ for message in st.session_state.messages:
 if question := st.chat_input("Type your question here..."):
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": question})
-    # Display user message in chat message container
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    # Display assistant response in chat message container
-    with st.chat_message("assistant"):
-        with st.spinner("Generating RAG response..."):
-            answer = generate_rag_response(
-                question=question,
-                collection_name=selected_collection
-            )
-            st.markdown(answer)
-            # Add assistant response to chat history
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+    # Generate and add assistant response to chat history
+    with st.spinner("Generating RAG response..."):
+        answer = generate_rag_response(
+            question=question,
+            collection_name=selected_collection,
+            embedding_model="nomic-embed-text"
+        )
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+    
+    # Rerun the app to display the new messages from history
+    st.rerun()

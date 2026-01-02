@@ -70,10 +70,10 @@ def generate_rag_response(
     logging.info("Documents fetched from database: %d", len(docs))
 
     # Log the retrieved documents for debugging purposes 
-    logging.info("--- CONTESTO RECUPERATO ---")
+    logging.debug("--- CONTESTO RECUPERATO ---")
     for i, doc in enumerate(docs):
-        logging.info("--- Documento %d ---\n%s\n--------------------", i+1, doc.page_content)
-    logging.info("--- FINE CONTESTO ---")
+        logging.debug("--- Documento %d ---\n%s\n--------------------", i+1, doc.page_content)
+    logging.debug("--- FINE CONTESTO ---")
 
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)
@@ -86,4 +86,5 @@ def generate_rag_response(
     
     # Send the prompt to the LLM model and get the answer
     response = client.chat(model = local_model, messages = [{'role': 'user', 'content': formatted_prompt}])
+    logging.info("Generated RAG Response.")
     return(response['message']['content'])

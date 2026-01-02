@@ -21,5 +21,5 @@ Il sistema è diviso in tre pipeline principali:
 ## 🛠️ Stack Tecnologico
 
 * **Orchestration**: [LangChain](https://python.langchain.com/)
-* **LLM & Embeddings**: [Ollama](https://ollama.com/) (Llama 3, mxbai-embed-large)
+* **LLM & Embeddings**: [Ollama](https://ollama.com/) (Llama 3, nomic-embed-text)
 * **Vector Database**: [ChromaDB](https://www.trychroma.com/)
