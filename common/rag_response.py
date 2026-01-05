@@ -2,7 +2,7 @@ from ollama import Client
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import logging
-import config
+import common.config as config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,10 +70,10 @@ def generate_rag_response(
     logging.info("Documents fetched from database: %d", len(docs))
 
     # Log the retrieved documents for debugging purposes 
-    logging.debug("--- CONTESTO RECUPERATO ---")
+    logging.debug("--- CONTEXT RETRIEVED ---")
     for i, doc in enumerate(docs):
-        logging.debug("--- Documento %d ---\n%s\n--------------------", i+1, doc.page_content)
-    logging.debug("--- FINE CONTESTO ---")
+        logging.debug("--- Document %d ---\n%s\n--------------------", i+1, doc.page_content)
+    logging.debug("--- END CONTEXT ---")
 
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)
@@ -87,4 +87,4 @@ def generate_rag_response(
     # Send the prompt to the LLM model and get the answer
     response = client.chat(model = local_model, messages = [{'role': 'user', 'content': formatted_prompt}])
     logging.info("Generated RAG Response.")
-    return(response['message']['content'])
+    return(response['message']['content'], docs)

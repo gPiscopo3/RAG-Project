@@ -60,7 +60,7 @@ def extract_images_from_pdf (file_path):
                 "content_type": "image_caption",
                 "page_number": page_num + 1,
                 "image_index_on_page": img_index,
-                "image_bbox": [img_bbox.x0, img_bbox.y0, img_bbox.x1, img_bbox.y1]
+                "image_bbox": str([img_bbox.x0, img_bbox.y0, img_bbox.x1, img_bbox.y1])
             }
             image_docs.append(Document(page_content=content, metadata=metadata))
 

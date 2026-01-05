@@ -1,5 +1,6 @@
 import chromadb
 import logging
+import common.config as config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -8,8 +9,8 @@ logging.basicConfig(
 
 def delete_chroma_collection(
                               collection_name: str, 
-                              persist_directory: str = "./chroma_db"
-                              ):
+                              persist_directory: str = config.PERSIST_DIRECTORY
+                            ):
     """
     Deletes a specified collection from the Chroma database.
 

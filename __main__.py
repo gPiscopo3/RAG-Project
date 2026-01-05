@@ -6,7 +6,6 @@ from utils.pdf_utils import process_pdf_to_chroma_db
 from common.rag_response import generate_rag_response
 from common import config
 
-
 st.title("RAG System with Local LLM and ChromaDB")
 st.text("Upload a PDF document then ask questions about its content.")
 
@@ -105,6 +104,12 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        if message["role"] == "assistant" and "sources" in message:
+            with st.expander("Sources"):
+                for i, doc in enumerate(message["sources"]):
+                    st.info(f"Source {i+1}:\n{doc.page_content}")
+                    if 'page' in doc.metadata:
+                        st.caption(f" - Page Number: {doc.metadata['page']}")
 
 # Accept user input
 if question := st.chat_input("Type your question here..."):
@@ -112,12 +117,12 @@ if question := st.chat_input("Type your question here..."):
     st.session_state.messages.append({"role": "user", "content": question})
     # Generate and add assistant response to chat history
     with st.spinner("Generating RAG response..."):
-        answer = generate_rag_response(
+        answer, sources = generate_rag_response(
             question=question,
             collection_name=selected_collection,
             embedding_model=config.EMBEDDING_MODEL,
         )
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
     
     # Rerun the app to display the new messages from history
     st.rerun()
