@@ -1,6 +1,7 @@
 from ollama import Client
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+from sentence_transformers import CrossEncoder
 import logging
 import common.config as config
 
@@ -74,6 +75,19 @@ def generate_rag_response(
     for i, doc in enumerate(docs):
         logging.debug("--- Document %d ---\n%s\n--------------------", i+1, doc.page_content)
     logging.debug("--- END CONTEXT ---")
+
+    # Sentence transformer layer to re-rank the retrieved documents based on their relevance to the search query
+    model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')
+    
+    # Create pairs of (query, document) for the cross-encoder and get scores
+    doc_scores = model.predict([[search_query, doc.page_content] for doc in docs])
+    
+    # Combine docs with their scores and sort
+    scored_docs = sorted(zip(docs, doc_scores), key=lambda x: x[1], reverse=True)
+    
+    # Select top 5 documents
+    docs = [doc for doc, score in scored_docs[:5]]
+    logging.info("Documents re-ranked. Top documents selected: %d", len(docs))
 
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)
