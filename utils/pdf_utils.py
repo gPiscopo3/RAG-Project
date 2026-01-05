@@ -3,12 +3,11 @@ import logging
 import camelot
 import fitz
 from common import config
-from pypdf import PdfReader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
-from langchain_chroma import Chroma
 from tabulate import tabulate
 
 logging.basicConfig(
@@ -16,21 +15,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-def extract_text_from_pdf(file_path):
-    reader = PdfReader(file_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() + "\n"
-    return text
-
 def normalize_text(text: str) -> str:
     """Pulisce il testo per l'embedding."""
     return text.replace("\n", " ").replace("\r", " ").strip().lower()
-
-def extract_metadata_from_pdf(file_path):
-    reader = PdfReader(file_path)
-    metadata = reader.metadata
-    return metadata
 
 def extract_images_from_pdf (file_path):
     """Estrae immagini e cerca di associare una didascalia testuale vicina."""
@@ -56,13 +43,14 @@ def extract_images_from_pdf (file_path):
 
             # Crea un documento con la descrizione dell'immagine
             content = f"[Image: An image is present on the page. Caption: '{caption}']"
+            normalized_content = normalize_text(content)
             metadata = {
                 "content_type": "image_caption",
                 "page_number": page_num + 1,
                 "image_index_on_page": img_index,
                 "image_bbox": str([img_bbox.x0, img_bbox.y0, img_bbox.x1, img_bbox.y1])
             }
-            image_docs.append(Document(page_content=content, metadata=metadata))
+            image_docs.append(Document(page_content=normalized_content, metadata=metadata))
 
     logging.info(f"Extracted {len(image_docs)} image captions from {file_path}")
     return image_docs
@@ -75,6 +63,7 @@ def extract_tables_from_pdf(file_path):
         for i, table in enumerate(tables):
             # Converte il DataFrame della tabella in una stringa Markdown
             markdown_table = tabulate(table.df, headers='keys', tablefmt='pipe')
+            normalized_table = normalize_text(markdown_table)
             
             # Crea un metadato per la tabella
             metadata = {
@@ -84,7 +73,7 @@ def extract_tables_from_pdf(file_path):
             }
             
             # Crea un Documento LangChain per ogni tabella
-            table_docs.append(Document(page_content=markdown_table, metadata=metadata))
+            table_docs.append(Document(page_content=normalized_table, metadata=metadata))
         
         logging.info(f"Extracted {len(table_docs)} tables from {file_path}")
         return table_docs
@@ -102,78 +91,75 @@ def process_pdf_to_chroma_db(
 ):
     
     """
-    Processes a PDF file, extracts the text, splits it into chunks, and creates a Chroma database.
-
-    Args:
-        pdf_path (str): Path to the PDF file.
-        chunk_size (int): Size of each text chunk.
-        chunk_overlap (int): Overlap between chunks.
-        persist_directory (str): Directory to save the Chroma database.
-        collection_name (str): Name of the collection in the Chroma database.
+    Processes a PDF file, extracts text, tables, and image captions,
+    splits the content into chunks, and creates a Chroma database.
     """ 
 
     if pdf_path is None or pdf_path.strip() == "":
         raise ValueError("A valid PDF path must be provided.")
 
-    # Usa il collection_name passato, oppure calcolalo come fallback
     if collection_name is None:
         collection_name = pdf_path.split("/")[-1].replace(".pdf", "_collection")
 
-    # Check if the collection already exists in ChromaDB
     chroma_client = chromadb.PersistentClient(path=persist_directory)
-
     try:
-        collection = chroma_client.get_collection(name=collection_name)
-        if collection:
+        if chroma_client.get_collection(name=collection_name):
             logging.info(f"Collection '%s' already exists in ChromaDB. Skipping processing.", collection_name)
             return
-    except chromadb.errors.NotFoundError:
+    except Exception:
         pass  # Collection does not exist, proceed with processing
 
-    table_docs = extract_tables_from_pdf(pdf_path)
-    image_docs = extract_images_from_pdf(pdf_path)
+    # 1. Estrai elementi non testuali (tabelle e immagini)
+    # table_docs = extract_tables_from_pdf(pdf_path)
+    # image_docs = extract_images_from_pdf(pdf_path)
 
-    # Extract metadata from PDF
-    pdf_metadata = extract_metadata_from_pdf(pdf_path)
-    logging.info("Extracted metadata from PDF.")
+    # 2. Estrai il testo usando PyMuPDFLoader di LangChain
+    logging.info("Extracting text with PyMuPDFLoader...")
+    loader = PyMuPDFLoader(pdf_path)
+    text_pages = loader.load()
+    logging.info(f"Extracted {len(text_pages)} pages of text.")
 
-    # Extract text from PDF page by page
-    reader = PdfReader(pdf_path)
-    
+    # 3. Suddividi il testo in chunk
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", " ", ".", ",", ""],
+        
+        separators=[
+            # --- Per Codice e Markdown ---
+            "\n```\n",  # Blocchi di codice
+            "\n## ",     # Intestazioni Markdown H2
+            "\n### ",    # Intestazioni Markdown H3
+            "\n#### ",   # Intestazioni Markdown H4
+            # --- Per Codice (ispirato a Python) ---
+            "\nclass ",
+            "\ndef ",
+            "\n\tdef ",
+            # --- Per Testo Strutturato e Paragrafi ---
+            "\n\n",      # Doppia riga nuova (paragrafi)
+            "\n",        # Riga nuova
+            # --- Per Frasi e Parole ---
+            ". ",        # Punti seguiti da spazio
+            " ",         # Spazi
+            ""           # Caratteri (fallback)
+        ],
         keep_separator=False
     )
+    text_docs = text_splitter.split_documents(text_pages)
 
-    text_docs = []
-    for i, page in enumerate(reader.pages):
-        page_text = page.extract_text()
-        if page_text:
-            chunks = text_splitter.split_text(page_text)
-            for j, chunk in enumerate(chunks):
-                chunk_metadata = pdf_metadata.copy()
-                chunk_metadata.update({
-                    "page_number": i + 1,
-                    "chunk_index_in_page": j,
-                    "original_text": chunk
-                })
-                
-                normalized_chunk = normalize_text(chunk)
+    # 4. Normalizza il contenuto dei chunk di testo
+    for doc in text_docs:
+        doc.page_content = normalize_text(doc.page_content)
 
-                text_docs.append(Document(page_content=normalized_chunk, metadata=chunk_metadata))
+    logging.info(f"Splitted text into {len(text_docs)} chunks.")
 
-    logging.info("Splitted into %d chunks.", len(text_docs))
+    # 5. Combina tutti i documenti
+    # docs = text_docs + table_docs + image_docs
+    docs = text_docs
+    logging.info(f"Total documents to be indexed: {len(docs)}")
+    # logging.info(f"Text documents: {len(text_docs)}, Table documents: {len(table_docs)}, Image documents: {len(image_docs)}")
 
-    docs = text_docs + table_docs + image_docs
-    logging.info(f"Total documents to be indeced: {len(docs)}")
-    logging.info(f"Text documents: {len(text_docs)}, Table documents: {len(table_docs)}, Image documents: {len(image_docs)}")
-
-    # Initialize the embeddings object
+    # 6. Inizializza gli embeddings e crea il database Chroma
     embeddings = OllamaEmbeddings(model=model)
-
-    # Create the Chroma database
     Chroma.from_documents(
         documents=docs,
         embedding=embeddings,
