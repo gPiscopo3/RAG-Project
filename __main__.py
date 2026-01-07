@@ -7,6 +7,9 @@ from common.rag_response import generate_rag_response
 from utils.chromadb_utils import delete_chroma_collection
 from common import config
 
+def clear_history():
+    st.session_state.messages = []
+
 st.title("RAG System with Local LLM and ChromaDB")
 st.text("Upload a PDF document then ask questions about its content.")
 
@@ -88,6 +91,8 @@ with st.sidebar:
             os.remove(temp_file_path)
             
             st.success(f"Processed {original_name} and updated ChromaDB.")
+
+    st.button("Clear Chat History", type="secondary", use_container_width=True, on_click=clear_history)
     
 
 # Main area for asking questions
@@ -127,3 +132,4 @@ if question := st.chat_input("Type your question here..."):
     
     # Rerun the app to display the new messages from history
     st.rerun()
+
