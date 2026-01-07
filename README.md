@@ -31,7 +31,7 @@ The system is divided into three main pipelines:
 *   **LLM & Embeddings**: [Ollama](https://ollama.com/) (Llama 3, nomic-embed-text)
 *   **Vector Database**: [ChromaDB](https://www.trychroma.com/)
 *   **Re-ranking**: [Sentence Transformers](https://www.sbert.net/) (Cross-Encoders)
-*   **PDF Processing**: PyMuPDF, camelot-py
+*   **PDF Processing**: [PyMuPDF](https://pymupdf.readthedocs.io/en/latest/index.html), [camelot-py](https://camelot-py.readthedocs.io/en/master/#)
 *   **Web Interface**: [Streamlit](https://streamlit.io/)
 
 ## Installation
@@ -45,8 +45,8 @@ Follow these steps to set up and run the project locally.
 
 **2. Clone the Repository**
 ```bash
-git clone <your-repository-url>
-cd <project-directory>
+git clone https://github.com/gPiscopo3/RAG-Project.git
+cd RAG-Project
 ```
 
 **3. Create a Virtual Environment and Install Dependencies**
@@ -73,7 +73,6 @@ Follow the instructions for your OS at [Ollama's official site](https://ollama.c
 ```bash
 ollama pull llama3
 ollama pull nomic-embed-text
-```
 ```
 
 ## Usage
