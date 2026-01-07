@@ -4,6 +4,7 @@ import chromadb
 import time
 from utils.pdf_utils import process_pdf_to_chroma_db
 from common.rag_response import generate_rag_response
+from utils.chromadb_utils import delete_chroma_collection
 from common import config
 
 st.title("RAG System with Local LLM and ChromaDB")
@@ -52,7 +53,7 @@ with st.sidebar:
             with col1:
                 if st.button("Yes, Delete", type="primary", key="confirm_delete_button", use_container_width=True):
                     try:
-                        chromadb_client.delete_collection(name=collection_to_remove)
+                        delete_chroma_collection(collection_name=collection_to_remove)
                         st.success(f"Collection '{collection_to_remove}' has been removed.")
                         st.session_state.confirm_delete = False
                         time.sleep(1)

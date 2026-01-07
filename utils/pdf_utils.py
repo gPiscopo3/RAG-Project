@@ -16,32 +16,32 @@ logging.basicConfig(
 )
 
 def normalize_text(text: str) -> str:
-    """Pulisce il testo per l'embedding."""
+    """Cleans the text for embedding."""
     return text.replace("\n", " ").replace("\r", " ").strip().lower()
 
 def extract_images_from_pdf (file_path):
-    """Estrae immagini e cerca di associare una didascalia testuale vicina."""
+    """Extracts images and tries to associate a nearby text caption."""
     doc = fitz.open(file_path)
     image_docs = []
     
     for page_num, page in enumerate(doc):
         image_list = page.get_images(full=True)
         
-        # Ordina le immagini per posizione verticale per processarle dall'alto verso il basso
+        # Sort images by vertical position to process them from top to bottom
         image_list.sort(key=lambda img: page.get_image_bbox(img).y1)
 
         for img_index, img in enumerate(image_list):
-            # Ottieni il bounding box dell'immagine
+            # Get the bounding box of the image
             img_bbox = page.get_image_bbox(img)
 
-            # Cerca il testo sotto l'immagine (potenziale didascalia)
-            # Definiamo un'area di ricerca sotto l'immagine
+            # Search for text below the image (potential caption)
+            # We define a search area below the image
             search_area = fitz.Rect(img_bbox.x0, img_bbox.y1, img_bbox.x1, img_bbox.y1 + 50)
             text_in_area = page.get_text("text", clip=search_area, sort=True).strip()
 
             caption = text_in_area if text_in_area else "No caption found"
 
-            # Crea un documento con la descrizione dell'immagine
+            # Create a document with the image description
             content = f"[Image: An image is present on the page. Caption: '{caption}']"
             normalized_content = normalize_text(content)
             metadata = {
@@ -56,23 +56,23 @@ def extract_images_from_pdf (file_path):
     return image_docs
 
 def extract_tables_from_pdf(file_path):
-    """Estrae le tabelle da un PDF e le converte in formato Markdown."""
+    """Extracts tables from a PDF and converts them to Markdown format."""
     try:
         tables = camelot.read_pdf(file_path, pages='all', flavor='lattice', suppress_stdout=True)
         table_docs = []
         for i, table in enumerate(tables):
-            # Converte il DataFrame della tabella in una stringa Markdown
+            # Converts the table's DataFrame into a Markdown string
             markdown_table = tabulate(table.df, headers='keys', tablefmt='pipe')
             normalized_table = normalize_text(markdown_table)
             
-            # Crea un metadato per la tabella
+            # Create metadata for the table
             metadata = {
                 "content_type": "table",
                 "page_number": table.page,
                 "table_index_on_page": i
             }
             
-            # Crea un Documento LangChain per ogni tabella
+            # Create a LangChain Document for each table
             table_docs.append(Document(page_content=normalized_table, metadata=metadata))
         
         logging.info(f"Extracted {len(table_docs)} tables from {file_path}")
@@ -109,56 +109,56 @@ def process_pdf_to_chroma_db(
     except Exception:
         pass  # Collection does not exist, proceed with processing
 
-    # 1. Estrai elementi non testuali (tabelle e immagini)
-    # table_docs = extract_tables_from_pdf(pdf_path)
-    # image_docs = extract_images_from_pdf(pdf_path)
+    # Extract non-text elements (tables and images)
 
-    # 2. Estrai il testo usando PyMuPDFLoader di LangChain
+    table_docs = extract_tables_from_pdf(pdf_path)
+    image_docs = extract_images_from_pdf(pdf_path)
+
+    # Extract text using LangChain's PyMuPDFLoader
     logging.info("Extracting text with PyMuPDFLoader...")
     loader = PyMuPDFLoader(pdf_path)
     text_pages = loader.load()
     logging.info(f"Extracted {len(text_pages)} pages of text.")
 
-    # 3. Suddividi il testo in chunk
+    # Split the text into chunks
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         
         separators=[
-            # --- Per Codice e Markdown ---
-            "\n```\n",  # Blocchi di codice
-            "\n## ",     # Intestazioni Markdown H2
-            "\n### ",    # Intestazioni Markdown H3
-            "\n#### ",   # Intestazioni Markdown H4
-            # --- Per Codice (ispirato a Python) ---
+            # --- For Code and Markdown ---
+            "\n```\n",  # Code blocks
+            "\n## ",     # Markdown H2 headers
+            "\n### ",    # Markdown H3 headers
+            "\n#### ",   # Markdown H4 headers
+            # --- For Code (inspired by Python) ---
             "\nclass ",
             "\ndef ",
             "\n\tdef ",
-            # --- Per Testo Strutturato e Paragrafi ---
-            "\n\n",      # Doppia riga nuova (paragrafi)
-            "\n",        # Riga nuova
-            # --- Per Frasi e Parole ---
-            ". ",        # Punti seguiti da spazio
-            " ",         # Spazi
-            ""           # Caratteri (fallback)
+            # --- For Structured Text and Paragraphs ---
+            "\n\n",      # Double newline (paragraphs)
+            "\n",        # Newline
+            # --- For Sentences and Words ---
+            ". ",        # Periods followed by a space
+            " ",         # Spaces
+            ""           # Characters (fallback)
         ],
         keep_separator=False
     )
     text_docs = text_splitter.split_documents(text_pages)
 
-    # 4. Normalizza il contenuto dei chunk di testo
+    # Normalize the content of text chunks
     for doc in text_docs:
         doc.page_content = normalize_text(doc.page_content)
 
     logging.info(f"Splitted text into {len(text_docs)} chunks.")
 
-    # 5. Combina tutti i documenti
-    # docs = text_docs + table_docs + image_docs
-    docs = text_docs
+    # Combine all documents
+    docs = text_docs + table_docs + image_docs
     logging.info(f"Total documents to be indexed: {len(docs)}")
-    # logging.info(f"Text documents: {len(text_docs)}, Table documents: {len(table_docs)}, Image documents: {len(image_docs)}")
+    logging.info(f"Text documents: {len(text_docs)}, Table documents: {len(table_docs)}, Image documents: {len(image_docs)}")
 
-    # 6. Inizializza gli embeddings e crea il database Chroma
+    # Initialize embeddings and create the Chroma database
     embeddings = OllamaEmbeddings(model=model)
     Chroma.from_documents(
         documents=docs,
