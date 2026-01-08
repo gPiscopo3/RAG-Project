@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import chromadb
 import time
+import json
 from utils.pdf_utils import process_pdf_to_chroma_db
 from common.rag_response import generate_rag_response
 from common.rag_response import highlight_relevant_passages
@@ -11,6 +12,15 @@ from common import config
 def clear_history():
     st.session_state.messages = []
 
+def download_chat():
+    if "messages" not in st.session_state or not st.session_state.messages:
+        st.warning("No chat history to download.")
+        return
+    
+    chat_history = st.session_state.messages
+    chat_json = json.dumps(chat_history, indent=2)
+    return chat_json
+
 st.title("RAG System with Local LLM and ChromaDB")
 st.text("Upload a PDF document then ask questions about its content.")
 
@@ -19,7 +29,7 @@ list_collections = chromadb_client.list_collections()
 
 # Side menu for show between existing collections
 with st.sidebar:
-
+    
     st.header("ChromaDB Collections", divider=True)
 
     st.subheader("Existing Collections")
@@ -93,8 +103,18 @@ with st.sidebar:
             
             st.success(f"Processed {original_name} and updated ChromaDB.")
 
+    st.header("Utility Buttons", divider=True)
+
     st.button("Clear Chat History", type="secondary", use_container_width=True, on_click=clear_history)
-    
+    st.download_button(
+        label="Download Chat History",
+        data=download_chat(),
+        file_name="chat_history.json",
+        mime="application/json",
+        use_container_width=True, 
+        icon=":material/download:",
+        type="primary"
+    )
 
 # Main area for asking questions
 if not list_collections:
@@ -153,4 +173,7 @@ if question := st.chat_input("Type your question here..."):
     
     # Rerun the app to display the new messages from history
     st.rerun()
+
+
+
 
