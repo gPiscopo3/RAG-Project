@@ -2,8 +2,10 @@ from ollama import Client
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from sentence_transformers import CrossEncoder
+from sentence_transformers import SentenceTransformer, util
 import logging
 import common.config as config
+import re
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,3 +104,47 @@ def generate_rag_response(
     response = client.chat(model = local_model, messages = [{'role': 'user', 'content': formatted_prompt}])
     logging.info("Generated RAG Response.")
     return(response['message']['content'], docs)
+
+
+def highlight_relevant_passages(answer, docs, num_snippets=3):
+    """
+    Function to highlight relevant passages from the retrieved documents in the generated answer.
+    It searches for sentences in the documents that contain keywords from the answer and highlights them.
+    Returns the answer with highlighted passages and their metadata.
+    """
+
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    # Split retrieved documents into sentences
+    answer_sentences = re.split(r'(?<=[.!?]) +', answer)
+
+    # Split the documents into sentences
+    doc_sentences = []
+    for doc in docs:
+        sentences = re.split(r'(?<=[.!?]) +', doc.page_content)
+        doc_sentences.extend(sentences)
+
+    # Compute similarity
+    answer_embeddings = model.encode(answer_sentences, convert_to_tensor=True)
+    doc_embeddings = model.encode(doc_sentences, convert_to_tensor=True)   
+    cosine_scores = util.pytorch_cos_sim(answer_embeddings, doc_embeddings)
+
+    # Find top relevant sentences
+    highlighted_passages = set()
+    for i in range(len(answer_sentences)):
+        best_index = cosine_scores[i].argmax().item()
+        highlighted_passages.add(doc_sentences[best_index])
+
+    # Highlight the phrases in the context and include metadata
+    highlighted_docs = []
+    for doc in docs: 
+        content = doc.page_content
+        for snippet in highlighted_passages:
+            if snippet in content:
+                content = content.replace(snippet, f":orange-background[{snippet}]")
+        highlighted_docs.append({
+            "content": content,
+            "metadata": doc.metadata if hasattr(doc, "metadata") else {}
+        })
+
+    return answer, highlighted_docs

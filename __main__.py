@@ -4,6 +4,7 @@ import chromadb
 import time
 from utils.pdf_utils import process_pdf_to_chroma_db
 from common.rag_response import generate_rag_response
+from common.rag_response import highlight_relevant_passages
 from utils.chromadb_utils import delete_chroma_collection
 from common import config
 
@@ -78,7 +79,7 @@ with st.sidebar:
         with st.spinner(f"Processing {uploaded_files.name}..."):
             original_name = uploaded_files.name
             collection_name = original_name.replace(".pdf", "_collection")
-            temp_file_path = f"./temp_{original_name}"
+            temp_file_path = f"./temp/temp_{original_name}"
             with open(temp_file_path, "wb") as temp_file:
                 temp_file.write(uploaded_files.getbuffer())
             
@@ -111,11 +112,29 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message["role"] == "assistant" and "sources" in message:
-            with st.expander("Sources"):
-                for i, doc in enumerate(message["sources"]):
-                    st.info(f"Source {i+1}:\n{doc.page_content}")
-                    if 'page' in doc.metadata:
-                        st.caption(f" - Page Number: {doc.metadata['page']}")
+            # Imposta expanded=False per evitare scroll automatico
+            with st.expander("Sources", expanded=False):
+                for i, source in enumerate(message["sources"]):
+                    if isinstance(source, dict):
+                        content = source.get("content", "")
+                        metadata = source.get("metadata", {})
+                    else:
+                        content = source
+                        metadata = {}
+                    if ":orange-background[" in content:
+                        st.info(f"Source {i+1}:\n{content}")
+                        if metadata:
+                            # Visualizza solo numero di pagina e parole chiave con carattere più piccolo
+                            page = metadata.get("page") or metadata.get("page_number")
+                            keywords = metadata.get("keywords", "")
+                            md = ""
+                            if page is not None:
+                                md += f"- **Page:** {page}\n"
+                            if keywords:
+                                md += f"- **Keywords:** {keywords}\n"
+                            if md:
+                                st.markdown(f"<span style='font-size: 0.85em'><b>Other Informations:</b><br>{md}</span>", unsafe_allow_html=True)
+
 
 # Accept user input
 if question := st.chat_input("Type your question here..."):
@@ -128,7 +147,9 @@ if question := st.chat_input("Type your question here..."):
             collection_name=selected_collection,
             embedding_model=config.EMBEDDING_MODEL,
         )
-        st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
+
+        answer, highlighted_sources = highlight_relevant_passages(answer, sources)
+        st.session_state.messages.append({"role": "assistant", "content": answer, "sources": highlighted_sources})
     
     # Rerun the app to display the new messages from history
     st.rerun()
