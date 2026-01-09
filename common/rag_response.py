@@ -8,7 +8,7 @@ import common.config as config
 import re
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=config.LOGGING_LEVEL,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
@@ -19,6 +19,7 @@ def generate_rag_response(
                           question          = None,
                           collection_name   = None, 
                           persist_directory = config.PERSIST_DIRECTORY,
+                          chat_history      = None
                           ):
     
     """
@@ -34,15 +35,44 @@ def generate_rag_response(
     # Initialize the Ollama client to interact with the LLM model
     client = Client(host=ollama_host_url)
 
+    history_str = ""
+    if chat_history:
+        history_str = "\n".join([f"User: {msg['content']}" if msg['role']=='user' else f"Assistant: {msg['content']}" for msg in chat_history if msg['role'] in ['user', 'assistant']])
+
+    logging.info("Generating search query for the question.")
+    logging.debug("Chat History: '%s'", chat_history)
     # Generate a search query from the user's question
     query_generation_prompt = f"""You are an expert at rephrasing a user's question into a concise, keyword-based search query for a vector database. 
-    Extract only the most critical entities and technical terms. Do not add any explanation or introductory text.
+    Extract only the most critical entities and technical terms from the user's question, using the chat history for context.
+    If the user's question is a follow-up, combine it with keywords from the history to create a specific query.
+    Do not add any explanation or introductory text. Your output must be only the search query.
 
-    Example:
+    ---
+    
+    **Multi-turn Example:**
+
+    Chat History:
+    User: explain what a for loop is in Python
+    Assistant: A for loop is used for iterating over a sequence (that is either a list, a tuple, a dictionary, a set, or a string).
+
+    User Question: "provide an example"
+    Search Query: "Python for loop code example"
+
+    ---
+
+    **Single-turn Example:**
+
+    Chat History:
+    
     User Question: "Can you tell me all about how to use AWS S3 for storing large video files?"
     Search Query: "AWS S3 large video file storage"
 
     ---
+
+    **Current Conversation:**
+
+    Chat History:
+    {history_str}
 
     User Question: "{question}"
     Search Query:"""
@@ -94,15 +124,28 @@ def generate_rag_response(
     # Merge the content of the documents into a single context
     context = "\n\n".join(doc.page_content for doc in docs)
 
+    messages = []
+    if chat_history:
+        messages.extend(chat_history)
+
     # Create the formatted prompt for the LLM model, including only the retrieved context
-    formatted_prompt = f"""Answer the question based ONLY on the following context:
-    {context}
-    Question: {question}
-    """
+    # This prompt encourages a more natural, conversational response.
+    formatted_prompt = f"""You are a helpful and friendly assistant.
+Use the provided context below to answer the user's question.
+Your goal is to have a natural conversation, so avoid starting your response with phrases like "Based on the context...".
+If the information is not in the context, just say that you couldn't find the answer in the provided document.
+
+---
+Context:
+{context}
+---
+Question: {question}
+"""
+
+    messages.append({'role': 'user', 'content': formatted_prompt})
     
     # Send the prompt to the LLM model and get the answer
-    response = client.chat(model = local_model, messages = [{'role': 'user', 'content': formatted_prompt}])
-    logging.info("Generated RAG Response.")
+    response = client.chat(model = local_model, messages = messages)
     return(response['message']['content'], docs)
 
 

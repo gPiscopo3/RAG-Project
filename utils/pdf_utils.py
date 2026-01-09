@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from tabulate import tabulate
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=config.LOGGING_LEVEL,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 

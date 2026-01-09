@@ -3,7 +3,7 @@ import logging
 import common.config as config
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=config.LOGGING_LEVEL,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
