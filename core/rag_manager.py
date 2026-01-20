@@ -4,7 +4,7 @@ from langchain_ollama import OllamaEmbeddings
 from sentence_transformers import CrossEncoder
 from sentence_transformers import SentenceTransformer, util
 import logging
-import common.config as config
+import config as config
 import re
 
 logging.basicConfig(
